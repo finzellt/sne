@@ -271,9 +271,17 @@ def is_valid_link(url):
         return False
     return True
 
+def get_first_value(name, field):
+    return catalog[name][field][0]['value'] if field in catalog[name] and catalog[name][field] else ''
+
+def get_first_kind(name, field):
+    return (catalog[name][field][0]['kind'] if field in catalog[name] and
+        catalog[name][field] and 'kind' in catalog[name][field][0] else '')
+
 catalog = OrderedDict()
 catalogcopy = OrderedDict()
-snepages = []
+snepages = [["# name", "aliases", "max apparent mag", "max mag date", "claimed type", "redshift", "redshift kind",
+    "ra", "dec", "# of photometric obs.", "URL"]]
 sourcedict = {}
 nophoto = []
 lcspye = []
@@ -354,18 +362,17 @@ for fcnt, eventfile in enumerate(sorted(files, key=lambda s: s.lower())):
     photoavail = 'photometry' in catalog[entry]
     numphoto = len([x for x in catalog[entry]['photometry'] if 'upperlimit' not in x]) if photoavail else 0
     catalog[entry]['numphoto'] = numphoto
+    plotlink = "sne/" + fileeventname + "/"
     if photoavail:
-        plotlink = "sne/" + fileeventname + "/"
         catalog[entry]['photoplot'] = plotlink
-        plotlink = "<a class='lci' href='" + plotlink + "' target='_blank'></a> "
-        catalog[entry]['photolink'] = plotlink + str(numphoto)
+        photolink = "<a class='lci' href='" + plotlink + "' target='_blank'></a> "
+        catalog[entry]['photolink'] = photolink + str(numphoto)
     spectraavail = 'spectra' in catalog[entry]
     catalog[entry]['numspectra'] = len(catalog[entry]['spectra']) if spectraavail else 0
     if spectraavail:
-        plotlink = "sne/" + fileeventname + "/"
         catalog[entry]['spectraplot'] = plotlink
-        plotlink = "<a class='sci' href='" + plotlink + "' target='_blank'></a> "
-        catalog[entry]['spectralink'] = plotlink + str(len(catalog[entry]['spectra']))
+        speclink = "<a class='sci' href='" + plotlink + "' target='_blank'></a> "
+        catalog[entry]['spectralink'] = speclink + str(len(catalog[entry]['spectra']))
 
     prange = list(range(len(catalog[entry]['photometry']))) if 'photometry' in catalog[entry] else []
     
@@ -781,7 +788,6 @@ for fcnt, eventfile in enumerate(sorted(files, key=lambda s: s.lower())):
         else:
             hostimgs.append([eventname, 'None'])
 
-    plotlink = "sne/" + fileeventname + "/"
     if hasimage:
         hostlink = "<a class='hhi' href='" + plotlink + "' target='_blank'></a>"
     else:
@@ -805,41 +811,17 @@ for fcnt, eventfile in enumerate(sorted(files, key=lambda s: s.lower())):
             p = VBox(HBox(p2,VBox(binslider,spacingslider)), width=900)
             #script, div = components(dict(p2=p2, binslider=binslider, spacingslider=spacingslider))
 
-        html = '<html><head><title>'+eventname+'</title>'
-        if photoavail or spectraavail:
-            html = file_html(p, CDN, eventname)
-            #html = html + '''<link href="https://cdn.pydata.org/bokeh/release/bokeh-0.11.0.min.css" rel="stylesheet" type="text/css">
-            #    <script src="https://cdn.pydata.org/bokeh/release/bokeh-0.11.0.min.js"></script>''' + script + '</head><body>'
-        else:
-            html = '<html><title></title><body></body></html>'
-
-        #if photoavail and spectraavail:
-        #    html = html + div['p1'] + div['p2']# + div['binslider'] + div['spacingslider']
-        #elif photoavail:
-        #    html = html + div['p1']
-        #elif spectraavail:
-        #    html = html + div['p2'] + div['binslider'] + div['spacingslider']
-
-        #html = html + '</body></html>'
-
-        html = re.sub(r'(\<\/title\>)', r'''\1\n
-            <base target="_parent" />\n
-            <link rel="stylesheet" href="event.css" type="text/css">\n
-            <script type="text/javascript">\n
-                if(top==self)\n
-                this.location="''' + eventname + '''"\n
-            </script>'''
-            , html)
+        script, html = components(p)
 
         repfolder = get_rep_folder(catalog[entry])
-        html = re.sub(r'(\<\/body\>)', '<div style="width:100%; text-align:center;">' + r'<a class="event-download" href="' +
-            linkdir + fileeventname + r'.json" download>' + r'Click to download all data for ' + eventname + ' in JSON format' +
-            r'</a></div>\n\1', html)
+        html = (html + script + '<div style="width:100%; text-align:center;">' + '<a class="event-download" href="' +
+            linkdir + fileeventname + '.json" download>' + 'Click to download all data for ' + eventname + ' in JSON format' +
+            '</a></div>\n')
 
-        newhtml = r'<div class="event-tab-div"><h3 class="event-tab-title">Event metadata</h3><table class="event-table"><tr><th width=100px class="event-cell">Quantity</th><th class="event-cell">Value<sup>sources</sup></th></tr>\n'
+        newhtml = '<div class="event-tab-div"><h3 class="event-tab-title">Event metadata</h3><table class="event-table"><tr><th width=100px class="event-cell">Quantity</th><th class="event-cell">Value<sup>sources</sup></th></tr>\n'
         for key in columnkey:
             if key in catalog[entry] and key not in eventignorekey and len(catalog[entry][key]) > 0:
-                newhtml = newhtml + r'<tr><td class="event-cell">' + eventpageheader[key] + r'</td><td width=250px class="event-cell">'
+                newhtml = newhtml + '<tr><td class="event-cell">' + eventpageheader[key] + '</td><td width=250px class="event-cell">'
                 
                 if isinstance(catalog[entry][key], str):
                     newhtml = newhtml + re.sub('<[^<]+?>', '', catalog[entry][key])
@@ -852,39 +834,39 @@ for fcnt, eventfile in enumerate(sorted(files, key=lambda s: s.lower())):
                                 if source == 'D':
                                     sourcehtml = sourcehtml + (',' if s > 0 else '') + source
                                 else:
-                                    sourcehtml = sourcehtml + (',' if s > 0 else '') + r'<a href="#source' + source + r'">' + source + r'</a>'
-                            newhtml = newhtml + (r'<br>' if r > 0 else '') + row['value']
+                                    sourcehtml = sourcehtml + (',' if s > 0 else '') + '<a href="#source' + source + '">' + source + '</a>'
+                            newhtml = newhtml + ('<br>' if r > 0 else '') + row['value']
                             if ((key == 'maxdate' or key == 'maxabsmag' or key == 'maxappmag') and 'maxband' in catalog[entry]
                                 and catalog[entry]['maxband']):
-                                newhtml = newhtml + r' [' + catalog[entry]['maxband'][0]['value'] + ']'
-                            newhtml = newhtml + r'<sup>' + sourcehtml + r'</sup>'
+                                newhtml = newhtml + ' [' + catalog[entry]['maxband'][0]['value'] + ']'
+                            newhtml = newhtml + '<sup>' + sourcehtml + '</sup>'
                         elif isinstance(row, str):
-                            newhtml = newhtml + (r'<br>' if r > 0 else '') + row.strip()
+                            newhtml = newhtml + ('<br>' if r > 0 else '') + row.strip()
 
-                newhtml = newhtml + r'</td></tr>\n'
-        newhtml = newhtml + r'</table><em>D = Derived value</em></div>\n\1'
-        html = re.sub(r'(\<\/body\>)', newhtml, html)
+                newhtml = newhtml + '</td></tr>\n'
+        newhtml = newhtml + '</table><em>D = Derived value</em></div>\n'
+        html = html + newhtml
 
         if 'sources' in catalog[entry] and len(catalog[entry]['sources']):
-            newhtml = r'<div class="event-tab-div"><h3 class="event-tab-title">Sources of data</h3><table class="event-table"><tr><th width=30px class="event-cell">ID</th><th class="event-cell">Source</th></tr>\n'
+            newhtml = '<div class="event-tab-div"><h3 class="event-tab-title">Sources of data</h3><table class="event-table"><tr><th width=30px class="event-cell">ID</th><th class="event-cell">Source</th></tr>\n'
             for source in catalog[entry]['sources']:
                 hasurlnobib = ('url' in source and 'bibcode' not in source)
-                newhtml = (newhtml + r'<tr><td class="event-cell" id="source' + source['alias'] + '">' + source['alias'] +
-                    r'</td><td width=250px class="event-cell">' + (('<a href="' + source['url'] + '">') if hasurlnobib else '') +
+                newhtml = (newhtml + '<tr><td class="event-cell" id="source' + source['alias'] + '">' + source['alias'] +
+                    '</td><td width=250px class="event-cell">' + (('<a href="' + source['url'] + '">') if hasurlnobib else '') +
                     source['name'].encode('ascii', 'xmlcharrefreplace').decode("utf-8") +
-                    (r'</a>' if hasurlnobib else '') +
-                    ((r'<br>\n' + (('<a href="' + source['url'] + '">') if 'url' in source else '') + source['bibcode'] +
-                    (r'</a>' if 'url' in source else '')) if 'bibcode' in source and source['name'] != source['bibcode'] else '') +
-                    r'</td></tr>\n')
-            newhtml = newhtml + r'</table><em>Sources are presented in order of importation, not in order of importance.</em></div>\n'
+                    ('</a>' if hasurlnobib else '') +
+                    (('<br>\n' + (('<a href="' + source['url'] + '">') if 'url' in source else '') + source['bibcode'] +
+                    ('</a>' if 'url' in source else '')) if 'bibcode' in source and source['name'] != source['bibcode'] else '') +
+                    '</td></tr>\n')
+            newhtml = newhtml + '</table><em>Sources are presented in order of importation, not in order of importance.</em></div>\n'
 
             if hasimage:
                 newhtml = newhtml + '<div class="event-host-div"><h3 class="event-host-title">Host Image</h3>' + skyhtml
-                newhtml = newhtml + r'</table><em>Host images are taken from SDSS if available; if not, DSS is used.</em></div>\n'
+                newhtml = newhtml + '</table><em>Host images are taken from SDSS if available; if not, DSS is used.</em></div>\n'
 
-        newhtml = newhtml + r'\n\1'
+        newhtml = newhtml + '\n'
 
-        html = re.sub(r'(\<\/body\>)', newhtml, html)
+        html = html + newhtml
 
         with open(outdir + fileeventname + ".html", "w") as fff:
             fff.write(html)
@@ -900,8 +882,11 @@ for fcnt, eventfile in enumerate(sorted(files, key=lambda s: s.lower())):
 
     # Save this stuff because next line will delete it.
     if args.writecatalog:
-        if 'photoplot' in catalog[entry]:
-            snepages.append(catalog[entry]['aliases'] + ['https://sne.space/' + catalog[entry]['photoplot']])
+        # Construct array for Bishop's webpage
+        # Things David wants in this file: names (aliases), max mag, max mag date (gregorian), type, redshift (helio), redshift (host), r.a., dec., # obs., link
+        snepages.append([entry, ",".join(catalog[entry]['aliases']), get_first_value(entry, 'maxappmag'), get_first_value(entry, 'maxdate'),
+            get_first_value(entry, 'claimedtype'), get_first_value(entry, 'redshift'), get_first_kind(entry, 'redshift'),
+            get_first_value(entry, 'ra'), get_first_value(entry, 'dec'), catalog[entry]['numphoto'], 'https://sne.space/' + plotlink])
 
         if 'sources' in catalog[entry]:
             lsourcedict = {}
@@ -972,7 +957,6 @@ if args.writecatalog and not args.eventlist:
     with open(outdir + 'hostimgs.json' + testsuffix, 'w') as f:
         f.write(jsonstring)
 
-    # Things David wants in this file: names (aliases), max mag, max mag date (gregorian), type, redshift, r.a., dec., # obs., link
     with open(outdir + 'snepages.csv' + testsuffix, 'w') as f:
         csvout = csv.writer(f, quotechar='"', quoting=csv.QUOTE_ALL)
         for row in snepages:
